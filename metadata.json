@@ -1,0 +1,6 @@
+{
+  "name": "Patch It Wellness",
+  "description": "Offline-first women's wellness companion for Zimbabwe, integrating symptom tracking, pelvic pain and endometriosis early screening, alternating thermal heat/cold cycles, predictive offline calendars, and unified community health channels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
