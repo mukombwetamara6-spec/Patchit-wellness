@@ -14,7 +14,9 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
-  Clock
+  Clock,
+  Search,
+  LayoutGrid
 } from "lucide-react";
 import CompanionApp from "./components/CompanionApp";
 import UssdSimulator from "./components/UssdSimulator";
@@ -43,6 +45,9 @@ export default function App() {
 
   const [loadingDb, setLoadingDb] = useState<boolean>(true);
   const [isSyncingOffline, setIsSyncingOffline] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'app' | 'telecom' | 'database'>('app');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [channelFilter, setChannelFilter] = useState<'all' | 'app' | 'ussd' | 'whatsapp'>('all');
 
   // Simulated Offline Mode - helps demonstrate PWA resilience in AI Studio preview
   const [isOfflineSimulated, setIsOfflineSimulated] = useState<boolean>(() => {
@@ -526,283 +531,548 @@ export default function App() {
     }, 100);
   };
 
+  const filteredRecords = dbState.records.filter(rec => {
+    if (channelFilter !== 'all' && rec.channel !== channelFilter) {
+      return false;
+    }
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      const mainSymptomMatch = rec.symptoms.some(s => s.toLowerCase().includes(q));
+      const textMatch = (rec.symptomText || '').toLowerCase().includes(q);
+      const productMatch = rec.products.some(p => p.toLowerCase().includes(q));
+      const channelMatch = rec.channel.toLowerCase().includes(q);
+      return mainSymptomMatch || textMatch || productMatch || channelMatch;
+    }
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 p-4 md:p-8 flex flex-col items-center justify-start gap-8 font-sans select-none relative overflow-y-auto">
+    <div className="min-h-screen bg-[#FAF9F5] text-slate-800 p-4 md:p-6 lg:p-8 flex flex-col items-center justify-start gap-6 font-sans select-none relative overflow-y-auto">
       
-      {/* BACKGROUND EFFECTS */}
-      <div className="absolute top-10 left-10 w-96 h-96 bg-rose-500/5 rounded-full blur-3xl pointer-events-none z-0" />
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none z-0" />
+      {/* SOLID CRYSTAL BACKGROUND GLOWS */}
+      <div className="absolute top-10 left-10 w-[500px] h-[500px] bg-rose-500/[0.03] rounded-full blur-3xl pointer-events-none z-0" />
+      <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-emerald-500/[0.03] rounded-full blur-3xl pointer-events-none z-0" />
 
-      {/* HEADER BAR - NAVIGATION DESIGN */}
-      <div className="w-full max-w-6xl bg-white border border-slate-200 rounded-3xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm z-10 shrink-0 select-text">
-        <div className="space-y-1">
+      {/* TOP SYSTEM BAR: CONNECTION STATUS SLIM LINE */}
+      <div className="w-full max-w-6xl z-10 shrink-0">
+        <div className={`w-full px-5 py-2.5 rounded-2xl border flex flex-col sm:flex-row justify-between items-center gap-3 transition-all duration-350 ${
+          isOfflineSimulated 
+            ? 'bg-amber-50/90 border-amber-200 text-amber-900 shadow-sm shadow-amber-500/5' 
+            : 'bg-white border-slate-200 shadow-sm text-slate-700'
+        }`}>
+          <div className="flex items-center gap-2.5 text-xs">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isOfflineSimulated ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOfflineSimulated ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+            </span>
+            <span className="font-medium font-mono text-[10.5px] uppercase tracking-wider">
+              {isOfflineSimulated ? (
+                <span>⚠️ Local Heuristic Cache Mode Active (Zimbabwe Telecom Outage Emulation)</span>
+              ) : (
+                <span>⚡ Active Live State: Harare Relational Server Node Online</span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 font-mono text-xs w-full sm:w-auto justify-end">
+            {/* OFFLINE / ONLINE TOGGLE BUTTON */}
+            <button
+              onClick={toggleOfflineSimulation}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 border shadow-sm cursor-pointer ${
+                isOfflineSimulated
+                  ? 'bg-amber-600 border-amber-700 text-white hover:bg-amber-700 shadow-amber-600/10'
+                  : 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800'
+              }`}
+            >
+              {isOfflineSimulated ? (
+                <>
+                  <WifiOff className="w-3.5 h-3.5 text-amber-200" />
+                  <span>📶 Switch Online</span>
+                </>
+              ) : (
+                <>
+                  <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>🌐 Switch Offline</span>
+                </>
+              )}
+            </button>
+
+            {/* SYNC MANUALLY BUTTON */}
+            {(offlineRecords.length + offlineForumPosts.length + offlineOrders.length) > 0 && (
+              <button
+                onClick={syncOfflineQueue}
+                disabled={isOfflineSimulated || isSyncingOffline}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition flex items-center gap-1.5 border ${
+                  isOfflineSimulated
+                    ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 hover:border-emerald-600 cursor-pointer animate-pulse'
+                }`}
+              >
+                {isSyncingOffline ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  Sync ({offlineRecords.length + offlineForumPosts.length + offlineOrders.length})
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* HEADER BAR & NAV CONTROLS INTERLOCK */}
+      <div className="w-full max-w-6xl bg-white border border-slate-200 rounded-[30px] p-5 md:p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm z-10 shrink-0 select-text">
+        
+        {/* BRAND BLOCK */}
+        <div className="space-y-1 text-left">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm">
+            <span className="w-10 h-10 bg-gradient-to-tr from-rose-500 to-rose-400 rounded-2xl flex items-center justify-center text-white font-extrabold text-xl shadow-xs">
               P
             </span>
-            <div className="space-y-0.5">
-              <h1 className="text-lg md:text-xl font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
-                <span>Patch It</span>
-                <span className="text-rose-500 font-medium text-xs ml-1 px-2.5 py-0.5 bg-rose-50 border border-rose-100 rounded-full">
+            <div>
+              <div className="flex items-center gap-1 flex-wrap">
+                <h1 className="text-xl font-black tracking-tight text-slate-900 leading-none">
+                  Patch It
+                </h1>
+                <span className="text-rose-500 font-bold text-[10px] uppercase px-2 py-0.5 bg-rose-50 border border-rose-100 rounded-full">
                   Wellness
                 </span>
                 <span className="text-slate-400 font-mono text-[9px] font-bold tracking-widest bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase">
-                  SIMULATOR DECK
+                  PWA V1.2
                 </span>
-              </h1>
-              <p className="text-xs text-slate-500 font-normal leading-relaxed">
+              </div>
+              <p className="text-[11px] text-slate-500 font-normal leading-normal mt-1">
                 {t.appSub}
               </p>
             </div>
           </div>
         </div>
 
-        {/* TOP LEVEL AGGREGATE IMPACT BAR */}
-        <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 w-full md:w-auto">
-          <div className="flex items-center gap-2.5 px-3 border-r border-slate-200 py-1">
-            <Users className="w-4 h-4 text-rose-500" />
-            <div>
-              <span className="text-[9px] font-mono text-slate-400 block uppercase font-bold">RURAL PATHWAYS DISTRIBUTION</span>
-              <span className="text-xs font-mono font-black text-rose-600">{dbState.impactStats.distributedFreeCount} packages</span>
-            </div>
-          </div>
+        {/* PREMIUM HORIZONTAL TAB SYSTEM */}
+        <div className="flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/50 w-full lg:w-auto font-mono text-[11px] uppercase font-black">
+          <button
+            onClick={() => setActiveTab('app')}
+            className={`flex-1 lg:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
+              activeTab === 'app'
+                ? 'bg-white text-rose-600 shadow-sm font-bold'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>Companion Portal</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('telecom')}
+            className={`flex-1 lg:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
+              activeTab === 'telecom'
+                ? 'bg-white text-rose-600 shadow-sm font-bold'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <WifiOff className="w-3.5 h-3.5" />
+            <span>Telecom Simulators</span>
+          </button>
 
-          <div className="flex items-center gap-2.5 px-3 border-r border-slate-200 py-1">
-            <Database className="w-4 h-4 text-emerald-500" />
-            <div>
-              <span className="text-[9px] font-mono text-slate-400 block uppercase font-bold">CHANNELS INTEGRATED</span>
-              <span className="text-xs font-mono font-black text-emerald-600">Active Live State</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 px-3 py-1">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <div>
-              <span className="text-[9px] font-mono text-slate-400 block uppercase font-bold">ECOCASH COIN MOBILIZED</span>
-              <span className="text-xs font-mono font-black text-amber-600">${dbState.impactStats.fundsMobilizedUSD.toFixed(2)}</span>
-            </div>
-          </div>
+          <button
+            onClick={() => setActiveTab('database')}
+            className={`flex-1 lg:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
+              activeTab === 'database'
+                ? 'bg-white text-rose-600 shadow-sm font-bold'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Central Sync DB</span>
+          </button>
         </div>
       </div>
 
-      {/* OFFLINE CACHING GATEWAY & SYNC CONTROL CENTER */}
-      <div className={`w-full max-w-6xl p-5 md:p-6 rounded-3xl border transition-all duration-300 z-10 shrink-0 ${
-        isOfflineSimulated 
-          ? 'bg-amber-50/70 border-amber-250 shadow-sm shadow-amber-500/5' 
-          : 'bg-white border-slate-200 shadow-sm'
-      }`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="space-y-1 md:max-w-2xl text-left select-text">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-2">
-              <span>🌐 PWA Offline-First Sync Gateway</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-            </h3>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              Zimbabwe Rural Telecom Resilience Protocol
-            </h2>
-            <p className="text-xs text-slate-500 leading-normal font-light">
-              This system intercepts connection losses seamlessly. When <strong>Simulate Offline Mode</strong> is active, all mobile interactions, state machines (USSD *123#), and WhatsApp medical queries cache instantly to local state (PWA Service Worker + LocalStorage). Once signal strength is restored, queued logs are flushed safely to the relational cloud node.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto shrink-0 font-mono">
-            {/* OFFLINE / ONLINE TOGGLER */}
-            <button
-              onClick={toggleOfflineSimulation}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition-all duration-200 flex items-center gap-2 border shadow-sm ${
-                isOfflineSimulated
-                  ? 'bg-amber-600 border-amber-755 text-white hover:bg-amber-700 shadow-amber-600/10'
-                  : 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800'
-              }`}
-            >
-              {isOfflineSimulated ? (
-                <>
-                  <WifiOff className="w-4 h-4 text-amber-200" />
-                  <span>📶 Simulated Offline</span>
-                </>
-              ) : (
-                <>
-                  <Wifi className="w-4 h-4 text-emerald-400" />
-                  <span>🌐 Simulated Online</span>
-                </>
-              )}
-            </button>
-
-            {/* SYNC ACTIONS BUTTON */}
-            {(offlineRecords.length + offlineForumPosts.length + offlineOrders.length) > 0 && (
+      {/* RURAL ACCESSIBILITY PROTOCOL BANNER IF ITEMS QUEUED */}
+      {(offlineRecords.length + offlineForumPosts.length + offlineOrders.length) > 0 && (
+        <div className="w-full max-w-6xl -mt-2 z-10 shrink-0">
+          <div className="bg-amber-500/[0.08] hover:bg-amber-500/[0.12] border border-amber-200/60 rounded-2xl px-5 py-3.5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left transition duration-200">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-mono tracking-wider font-extrabold text-amber-800 uppercase block">Local Queue Status</span>
+              <p className="text-xs text-amber-900 leading-normal font-light">
+                You have logged <strong>{offlineRecords.length} symptoms</strong>, <strong>{offlineForumPosts.length} forum responses</strong>, and <strong>{offlineOrders.length} patch kit orders</strong> while off the regional network grid. These are temporarily cached in your browser.
+              </p>
+            </div>
+            {isOfflineSimulated ? (
+              <span className="text-[10px] uppercase font-mono font-black bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg">
+                ⚠️ Click &apos;Simulated Online&apos; at top left to synchronise
+              </span>
+            ) : (
               <button
                 onClick={syncOfflineQueue}
-                disabled={isOfflineSimulated || isSyncingOffline}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition flex items-center gap-2 border ${
-                  isOfflineSimulated
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 hover:border-emerald-600 cursor-pointer animate-pulse'
-                }`}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg border border-emerald-500 flex items-center gap-1.5 transition shadow-xs animate-bounce"
               >
-                {isSyncingOffline ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                <span>
-                  Sync Cache ({offlineRecords.length + offlineForumPosts.length + offlineOrders.length} items)
-                </span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Synchronise Client Logs</span>
               </button>
             )}
           </div>
         </div>
+      )}
 
-        {/* STATUS BAR DRAWER WHEN OFFLINE ITEMS EXIST */}
-        {(offlineRecords.length + offlineForumPosts.length + offlineOrders.length) > 0 && (
-          <div className="mt-4 border-t border-slate-200/50 pt-3.5 flex flex-wrap items-center justify-between gap-3 text-left">
-            <div className="flex flex-wrap items-center gap-4 text-[11px] font-mono select-text text-slate-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                Symptom Logs: <strong>{offlineRecords.length} queued</strong>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                Forum Posts: <strong>{offlineForumPosts.length} queued</strong>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                Ecomm Orders: <strong>{offlineOrders.length} queued</strong>
-              </span>
-            </div>
+      {/* CORE WORKSPACE VIEW */}
+      <div className="w-full max-w-6xl z-10 select-text flex-1">
+        
+        {/* -------------------- TAB 1: SMARTPHONE APP VIEW -------------------- */}
+        {activeTab === 'app' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start my-2 animate-fadeIn">
             
-            {isOfflineSimulated && (
-              <span className="text-[10px] uppercase tracking-wide font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 px-2.5 py-0.5 rounded border border-amber-200 transition">
-                ⚠️ Toggle ONLINE to enable manual cloud synchronization
-              </span>
-            )}
+            {/* PORTRAIT APPS COMPONENT (LEFT) */}
+            <div className="lg:col-span-7 flex flex-col w-full">
+              
+              <div className="text-left mb-3">
+                <span className="text-[10px] tracking-widest font-mono text-rose-500 font-extrabold uppercase">
+                  💖 PATCH IT COMPANION HUB
+                </span>
+              </div>
+
+              <CompanionApp 
+                language={language}
+                setLanguage={setLanguage}
+                dbState={dbState}
+                onRefresh={fetchDashboardState}
+                isOfflineSimulated={isOfflineSimulated}
+              />
+
+            </div>
+
+            {/* EDUCATIONAL CASE MODULE (RIGHT) */}
+            <div className="lg:col-span-5 space-y-6 text-left">
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono text-rose-500 font-extrabold uppercase tracking-widest">Accessibility Concept</span>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                    The Zimbabwe Rural Health Accessibility Map
+                  </h2>
+                  <p className="text-xs text-slate-500 leading-normal font-light">
+                    Over 52% of women experiencing chronic pelvic pain, endometriosis, or menstrual discomfort in rural parts of Masvingo, Chitungwiza, and Bindura operate with severe battery limitations, cellular network blackouts, and high data barriers. Here is how Patch It delivers relief:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Cyclic Thermal Relief</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-light">
+                      Creates active 20/20-minute hot and cold alternating timelines to maximize uterine arterial expansion safely without the need for electricity.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Droplet className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">AI Local Tea Classifier</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-light">
+                      A fast offline language engine that decodes symptom text in ChiShona or isiNdebele, matching discomfort with local remedies like Zumbani and Makoni tea.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Pain Screenings</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-light">
+                      Integrates early diagnostic questionnaires for Endometriosis, Adenomyosis, or chronic blockages, allowing patients to consult clinical hubs remotely.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Subsidized Redistribution</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-light">
+                      For every premium healthcare transdermal patch ordered by urban consumers, 6 thermal patch packs are distributed free of charge to girls in rural secondary schools.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-[11px] font-mono text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    Offline Service Worker registered & active
+                  </span>
+                  <span className="bg-slate-100 px-2 py-0.5 rounded border text-slate-500">
+                    Offline Capacity Code: PWA-2026
+                  </span>
+                </div>
+              </div>
+
+              {/* BRIEF OFF-GRID INSTRUCTIONS WRAPPER */}
+              <div className="bg-gradient-to-tr from-slate-900 to-slate-800 p-6 rounded-3xl text-left text-white border border-slate-950 space-y-2.5">
+                <h3 className="text-xs font-mono uppercase tracking-widest text-rose-400 font-extrabold flex items-center gap-2">
+                  <span>How to Test Offline Caching resilience:</span>
+                </h3>
+                <ol className="list-decimal list-inside text-xs text-slate-300 space-y-2 font-light leading-relaxed">
+                  <li>Toggle the <strong>📶 Simulated Offline</strong> button in the top system bar.</li>
+                  <li>Go into the Smartphone interactive screen, toggle symptom logs, make entries, or try placing an order.</li>
+                  <li>Watch how the client-side system caches entries gracefully immediately in memory.</li>
+                  <li>Switch back <strong>🌐 Simulated Online</strong>, click and look at the bottom central database to sync!</li>
+                </ol>
+              </div>
+
+            </div>
+
           </div>
         )}
-      </div>
 
-      {/* MAIN SCREEN WORKSPACE GRID */}
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start justify-center z-10 select-text">
-
-        {/* COLUMN 1: SMARTPHONE APP VIEW (Columns 5/12) */}
-        <div className="lg:col-span-5 flex justify-center w-full">
-          <div className="w-full max-w-md">
-            <div className="text-center mb-3">
-              <span className="text-[10px] uppercase tracking-widest font-mono text-rose-600 font-black">
-                📱 PART A: SMARTPHONE PORTAL
-              </span>
-            </div>
+        {/* -------------------- TAB 2: TELECOM GATEWAYS -------------------- */}
+        {activeTab === 'telecom' && (
+          <div className="space-y-6 my-2 text-left animate-fadeIn">
             
-            <CompanionApp 
-              language={language}
-              setLanguage={setLanguage}
-              dbState={dbState}
-              onRefresh={fetchDashboardState}
-              isOfflineSimulated={isOfflineSimulated}
-            />
-          </div>
-        </div>
-
-        {/* COLUMN 2: OFFLINE TELECOM TELECOM EMULATION GATEWAYS & DATABASE INSPECTOR (Columns 7/12) */}
-        <div className="lg:col-span-7 flex flex-col gap-6 w-full">
-          
-          <div className="text-center lg:text-left">
-            <span className="text-[10px] uppercase tracking-widest font-mono text-rose-600 font-black block">
-              📶 PART B: TELECOM SIMULATION GATEWAYS
-            </span>
-          </div>
-
-          {/* TELECOM CHANNELS GRID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <UssdSimulator 
-              language={language} 
-              onRefresh={fetchDashboardState} 
-            />
-
-            <WhatsappSimulator 
-              language={language}
-              onRefresh={fetchDashboardState}
-            />
-          </div>
-
-          {/* REAL-TIME RELATIONAL SCHEMA VIEW */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col gap-4 shadow-sm text-slate-800">
-            <div className="flex justify-between items-center select-none">
-              <div className="flex items-center gap-2">
-                <Database className="w-4.5 h-4.5 text-rose-500" />
-                <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900">
-                  {t.unifiedDbTitle}
-                </h3>
-              </div>
-              <span className="text-[10px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-mono text-slate-650">
-                {dbState.records.length} logs synced
-              </span>
+            <div className="max-w-3xl space-y-1">
+              <span className="text-[10px] font-mono text-rose-500 font-extrabold uppercase tracking-widest">Alternative Connectivity Channels</span>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">Offline Dumbphone Connectivity Channels</h2>
+              <p className="text-xs text-slate-500 leading-normal font-light">
+                Over 90% of rural patients in Zimbabwe experience mobile data exclusion. To counter this, Patch It integrates USSD *123# protocol frameworks and low-bandwidth WhatsApp packets. Both channels operate on native cellular towers and sync with our regional healthcare nodes wirelessly.
+              </p>
             </div>
 
-            {loadingDb ? (
-              <div className="text-center font-mono py-8 text-slate-400 text-xs">
-                Synchronizing relational schema...
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+              
+              {/* USSD COMPONENT CONTAINER */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-5 w-5 bg-sky-500 text-white rounded-md text-[10px] font-mono font-bold flex items-center justify-center">1</span>
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">USSD Gateway (*123# Session)</h3>
+                </div>
+                <UssdSimulator 
+                  language={language} 
+                  onRefresh={fetchDashboardState} 
+                />
               </div>
-            ) : (
-              <div className="overflow-x-auto border border-slate-200 rounded-2xl bg-slate-50/50">
-                <table className="w-full text-left font-sans text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 text-[10px] uppercase bg-slate-50 font-semibold">
-                      <th className="p-3">Time</th>
-                      <th className="p-3">Source Channel</th>
-                      <th className="p-3 text-center">Intensity</th>
-                      <th className="p-3">Logged Symptoms</th>
-                      <th className="p-3">Remedy Pipeline</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 leading-relaxed font-light text-slate-700">
-                    {dbState.records.map((rec, i) => (
-                      <tr key={rec.id} className="hover:bg-slate-50/80 transition-all duration-150">
-                        <td className="p-3 text-slate-500 font-mono text-[11px] max-w-[100px] truncate" title={new Date(rec.timestamp).toLocaleString()}>
-                          {new Date(rec.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold uppercase ${rec.channel === 'app' ? 'bg-rose-50 border border-rose-100 text-rose-600' : rec.channel === 'whatsapp' ? 'bg-emerald-5 border border-emerald-100 text-emerald-600' : 'bg-sky-50 border border-sky-100 text-sky-600'}`}>
-                              {rec.channel}
-                            </span>
-                            {rec.id.toString().includes("-off") && (
-                              <span className="px-1.5 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 text-[8px] font-mono uppercase font-bold rounded">
-                                Queue
+
+              {/* WHATSAPP ASSISTANT CONTAINER */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-5 w-5 bg-emerald-500 text-white rounded-md text-[10px] font-mono font-bold flex items-center justify-center">2</span>
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">WhatsApp Assistant (Chatbot Agent)</h3>
+                </div>
+                <WhatsappSimulator 
+                  language={language}
+                  onRefresh={fetchDashboardState}
+                />
+              </div>
+
+            </div>
+
+            <div className="bg-slate-50 p-4 border border-slate-200 rounded-2xl text-[11px] text-slate-500 font-mono flex items-start gap-2 max-w-4xl">
+              <span className="text-rose-500 font-extrabold shrink-0">📍 TECHNICAL PROTOCOL:</span>
+              <p className="leading-relaxed">
+                Both simulators are connected directly to the central mock API proxy inside App memory. Whenever you trigger logs, select options, or chat offline, items are instantly queued using identical service-worker parameters and resolve consistently on the database!
+              </p>
+            </div>
+
+          </div>
+        )}
+
+        {/* -------------------- TAB 3: HEALTH DATABASE -------------------- */}
+        {activeTab === 'database' && (
+          <div className="space-y-6 my-2 text-left animate-fadeIn">
+            
+            {/* ANALYTICS ROW CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1.5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Distributions Tracked</span>
+                  <h4 className="text-xl font-black text-rose-600 tracking-tight">
+                    {dbState.impactStats.distributedFreeCount} packages
+                  </h4>
+                  <p className="text-[10px] text-slate-500 leading-normal font-light mt-1">
+                    Free thermal transdermal kits dispatched to secondary schools in Mutare &amp; Gweru.
+                  </p>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1 mt-3 overflow-hidden">
+                  <div className="bg-rose-500 h-full rounded-full" style={{ width: '74%' }} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1.5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Rural Coin Mobilized</span>
+                  <h4 className="text-xl font-black text-emerald-600 tracking-tight">
+                    ${dbState.impactStats.fundsMobilizedUSD.toFixed(2)}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 leading-normal font-light mt-1">
+                    Aggregate community contributions processed safely offline via EcoCash &amp; cash nodes.
+                  </p>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1 mt-3 overflow-hidden">
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: '62%' }} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-1.5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Registered Databases</span>
+                  <h4 className="text-xl font-black text-amber-600 tracking-tight">
+                    Active Sync State
+                  </h4>
+                  <p className="text-[10px] text-slate-500 leading-normal font-light mt-1">
+                    Live telemetry interlock between regional mobile subscribers and centralized health metrics.
+                  </p>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1 mt-3 overflow-hidden">
+                  <div className="bg-amber-500 h-full rounded-full animate-pulse" style={{ width: '100%' }} />
+                </div>
+              </div>
+
+            </div>
+
+            {/* REAL-TIME SCHEMA DATATABLE VIEW */}
+            <div className="bg-white p-6 rounded-[30px] border border-slate-200 shadow-xs space-y-5 flex flex-col select-text">
+              
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none">
+                <div className="flex items-center gap-2">
+                  <Database className="w-4.5 h-4.5 text-rose-500" />
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-900">
+                    Central Relational Health Log Node
+                  </h3>
+                </div>
+
+                <div className="text-[10px] font-mono bg-slate-50 border px-3 py-1.5 rounded-xl text-slate-650 font-bold">
+                  {dbState.records.length} total entries mapped
+                </div>
+              </div>
+
+              {/* SEARCH & FILTER CONTROLS BAR */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                
+                {/* SEARCH INPUT */}
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search logs by symptom, remedy, or channel..."
+                    className="w-full bg-slate-55/85 text-xs text-slate-800 placeholder-slate-400 pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 transition-all font-sans"
+                  />
+                </div>
+
+                {/* CHANNEL FILTERS */}
+                <div className="flex gap-1.5 bg-slate-100/85 p-1 rounded-2xl border text-[10px] font-mono leading-none tracking-wider font-extrabold uppercase shrink-0">
+                  <button
+                    onClick={() => setChannelFilter('all')}
+                    className={`px-3 py-2 rounded-xl transition ${
+                      channelFilter === 'all' ? 'bg-white text-rose-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setChannelFilter('app')}
+                    className={`px-3 py-2 rounded-xl transition ${
+                      channelFilter === 'app' ? 'bg-white text-rose-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    App
+                  </button>
+                  <button
+                    onClick={() => setChannelFilter('ussd')}
+                    className={`px-3 py-2 rounded-xl transition ${
+                      channelFilter === 'ussd' ? 'bg-white text-rose-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    USSD
+                  </button>
+                  <button
+                    onClick={() => setChannelFilter('whatsapp')}
+                    className={`px-3 py-2 rounded-xl transition ${
+                      channelFilter === 'whatsapp' ? 'bg-white text-rose-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    WhatsApp
+                  </button>
+                </div>
+
+              </div>
+
+              {loadingDb ? (
+                <div className="text-center font-mono py-12 text-slate-400 text-xs animate-pulse">
+                  Synchronizing relational schema...
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-[22px] bg-slate-50/20">
+                  <table className="w-full text-left font-sans text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 text-[10px] uppercase bg-slate-50/50 font-bold">
+                        <th className="p-3.5 pl-4">Time</th>
+                        <th className="p-3.5">Source Channel</th>
+                        <th className="p-3.5 text-center">Intensity</th>
+                        <th className="p-3.5">Logged Symptoms</th>
+                        <th className="p-3.5 pr-4">Remedy Pipeline Match</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 leading-relaxed font-light text-slate-700">
+                      {filteredRecords.map((rec) => (
+                        <tr key={rec.id} className="hover:bg-slate-50/80 transition-all duration-150">
+                          <td className="p-3.5 pl-4 text-slate-500 font-mono text-[11px] max-w-[100px] truncate" title={new Date(rec.timestamp).toLocaleString()}>
+                            {new Date(rec.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold uppercase border ${
+                                rec.channel === 'app' 
+                                  ? 'bg-rose-50 border-rose-100 text-rose-600' 
+                                  : rec.channel === 'whatsapp' 
+                                  ? 'bg-emerald-50 border-emerald-100 text-emerald-600' 
+                                  : 'bg-sky-50 border-sky-100 text-sky-600'
+                              }`}>
+                                {rec.channel === 'ussd' ? 'ussd *123#' : rec.channel}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3 text-center font-bold">
-                          <span className={`${rec.intensity >= 7 ? 'text-rose-600' : rec.intensity >= 4 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {rec.intensity}/10
-                          </span>
-                        </td>
-                        <td className="p-3 max-w-[150px] truncate font-medium text-slate-800" title={rec.symptoms.join(", ")}>
-                          {rec.symptoms.join(", ")}
-                        </td>
-                        <td className="p-3 text-slate-500 max-w-[160px] truncate font-mono text-[11px]" title={rec.products.join(", ")}>
-                          {rec.products.join(", ")}
-                        </td>
-                      </tr>
-                    ))}
-                    {dbState.records.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="text-center py-8 text-slate-400 italic font-mono text-xs">
-                          No logged entries tracked. Submit symptoms or dial USSD to populate.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                              {rec.id.toString().includes("-off") && (
+                                <span className="px-1.5 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 text-[8px] font-mono uppercase font-black rounded">
+                                  Cached Offline
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5 text-center font-bold">
+                            <span className={`${rec.intensity >= 7 ? 'text-rose-600' : rec.intensity >= 4 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {rec.intensity}/10
+                            </span>
+                          </td>
+                          <td className="p-3.5 max-w-[150px] truncate font-medium text-slate-800" title={rec.symptoms.join(", ")}>
+                            {rec.symptoms.join(", ")}
+                          </td>
+                          <td className="p-3.5 pr-4 text-slate-500 max-w-[200px] truncate font-mono text-[11px]" title={rec.products.join(", ")}>
+                            {rec.products.join(", ")}
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredRecords.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="text-center py-12 text-slate-400 italic font-mono text-xs">
+                            No logs found matching search filters. Click tabs above or log a symptom!
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="text-[11.5px] leading-relaxed text-slate-500 border-t border-slate-100 pt-3.5 select-none font-light">
+                📊 <strong>Sync Engine Specifications:</strong> Data flows into this local ledger node concurrently. Logged entries from non-smartphone clients (USSD) are packet-buffered, assigned standard geographic signatures, and mapped synchronously so health officials can view real-time pelvic pain heatmaps in any Harare cluster.
               </div>
-            )}
 
-            <div className="text-[11px] leading-relaxed text-slate-550 border-t border-slate-100 pt-3 select-none">
-              📍 <strong>Zimbabwe Hybrid-Sync Protocol Engine:</strong> All entries logged via offline dumbphones (USSD *123#) or WhatsApp packets undergo local state compaction and resolve on this active relational repository concurrently, providing immediate health statistics for macro enterprise planning.
             </div>
-          </div>
 
-        </div>
+          </div>
+        )}
 
       </div>
 

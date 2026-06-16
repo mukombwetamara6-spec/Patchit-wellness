@@ -585,7 +585,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-white border-[10px] border-slate-900 rounded-[3rem] overflow-hidden shadow-2xl relative flex flex-col h-[820px] text-slate-800 font-sans">
+    <div className="w-full bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs relative flex flex-col h-[780px] text-slate-800 font-sans">
       
       {/* 1. SMARTPHONE NOTCH HEADER */}
       <div className="bg-white px-6 pt-6 pb-4 flex justify-between items-center border-b border-slate-100 z-30 shrink-0">
