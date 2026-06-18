@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Phone, WifiOff, RefreshCw } from "lucide-react";
 import { Language, PainRecord } from "../types";
 import { LOCAL_TRANSLATIONS } from "../data";
+import { apiFetch } from "../utils/apiFetch";
 
 interface UssdSimulatorProps {
   language: Language;
@@ -23,7 +24,7 @@ export default function UssdSimulator({ language, onRefresh }: UssdSimulatorProp
     setIsLoading(true);
     setIsActive(true);
     try {
-      const resp = await fetch("/api/ussd", {
+      const resp = await apiFetch("/api/ussd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionKey, userInput: "", language })
@@ -45,7 +46,7 @@ export default function UssdSimulator({ language, onRefresh }: UssdSimulatorProp
     setIsLoading(true);
     const valueToSend = customValue !== undefined ? customValue : userInput;
     try {
-      const resp = await fetch("/api/ussd", {
+      const resp = await apiFetch("/api/ussd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionKey, userInput: valueToSend, language })

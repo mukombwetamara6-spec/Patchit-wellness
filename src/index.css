@@ -1,1 +1,41 @@
 @import "tailwindcss";
+
+@theme {
+  /* Override the rose palette to render as a stunning Pink and Purple wellness spectrum */
+  --color-rose-50: #faf5ff;     /* Exquisite lilac white */
+  --color-rose-100: #f3e8ff;    /* Soft purple tint */
+  --color-rose-200: #e9d5ff;    /* Lavender shine */
+  --color-rose-300: #ffd6e8;    /* Pastel sweet pink */
+  --color-rose-400: #f472b6;    /* Medium rose-pink */
+  --color-rose-500: #ec4899;    /* Hot wellness pink */
+  --color-rose-600: #9333ea;    /* Deep royal purple */
+  --color-rose-700: #7e22ce;    /* Velvet violet purple */
+  --color-rose-800: #6b21a8;    /* Dark lavender plum */
+  --color-rose-900: #581c87;    /* Ink grape */
+  --color-rose-950: #3b0764;    /* Night eggplant */
+
+  /* Override emerald & other status highlights optional maps to preserve high accessibility */
+  --color-emerald-50: #fdf2f8;  /* Pink blush */
+  --color-emerald-100: #fce7f3; /* Pearl pink */
+  --color-emerald-500: #db2777; /* Deep pink accent */
+  --color-emerald-600: #be185d; 
+  --color-emerald-800: #9d174d;
+
+  --color-amber-50: #fdf4ff;   /* Light fuchsia tint */
+  --color-amber-100: #f5d0fe;  /* Fuchsia border tint */
+  --color-amber-500: #c084fc;  /* Pastel purple */
+  --color-amber-600: #a855f7;  /* High-contrast purple */
+  --color-amber-900: #7e22ce;
+}
+
+/* Base style adjustments for extra pink/purple visual identity */
+.tag-sparkle {
+  background: linear-gradient(135deg, #fdf4ff 0%, #fbe7ff 100%);
+  border-color: #f5d0fe;
+  color: #a855f7;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #e9d5ff;
+  border-radius: 9999px;
+}

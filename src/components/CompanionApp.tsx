@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { Language, LifeStage, PainRecord, StoreProduct, PodcastEpisode, PatchReminder } from "../types";
 import { LOCAL_TRANSLATIONS } from "../data";
+import { apiFetch } from "../utils/apiFetch";
 
 interface CompanionAppProps {
   language: Language;
@@ -164,6 +165,19 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
   const [forumInput, setForumInput] = useState<string>("");
   const [forumLoading, setForumLoading] = useState<boolean>(false);
   const [forumCategory, setForumCategory] = useState<string>("all");
+  const [forumUsername, setForumUsername] = useState<string>("");
+  const [forumSelectedTags, setForumSelectedTags] = useState<string[]>([]);
+  const [forumFilterTag, setForumFilterTag] = useState<string>("all");
+
+  // Partner Sharing Sync States
+  const [partnerSyncActive, setPartnerSyncActive] = useState<boolean>(true);
+  const [partnerShareIntensity, setPartnerShareIntensity] = useState<boolean>(true);
+  const [partnerShareSymptoms, setPartnerShareSymptoms] = useState<boolean>(true);
+  const [partnerShareProducts, setPartnerShareProducts] = useState<boolean>(false);
+  const [partnerShareDaysMissed, setPartnerShareDaysMissed] = useState<boolean>(true);
+  const [partnerLinkCode, setPartnerLinkCode] = useState<string>("PTN-893-ZW");
+  const [partnerLinkedName, setPartnerLinkedName] = useState<string>("Tinashe");
+  const [partnerLinkedStatus, setPartnerLinkedStatus] = useState<string>("Active Syncing (Real-Time)");
 
   // Postpartum Exercise guides states
   const [activeExerciseIdx, setActiveExerciseIdx] = useState<number>(-1);
@@ -381,23 +395,27 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Submit Anonymized Forum Post
+  // Submit Anonymized or Custom Name Forum Post
   const submitForumPost = async (e: FormEvent) => {
     e.preventDefault();
     if (!forumInput.trim()) return;
     setForumLoading(true);
 
     try {
-      const response = await fetch("/api/forum", {
+      const response = await apiFetch("/api/forum", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: forumInput,
-          category: lifeStage
+          category: lifeStage,
+          username: forumUsername,
+          tags: forumSelectedTags
         })
       });
       if (response.ok) {
         setForumInput("");
+        setForumUsername("");
+        setForumSelectedTags([]);
         onRefresh(); // Get refreshed forum posts from the server
       }
     } catch (err) {
@@ -411,7 +429,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
   const conductResetReminder = async (id: string) => {
     setResetReminderLoadingId(id);
     try {
-      const response = await fetch("/api/reminders/reset", {
+      const response = await apiFetch("/api/reminders/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
@@ -446,7 +464,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
   // 3. REMINDER TOGGLES WITH SERVER BROADCAST
   const toggleReminder = async (id: string, currentlyEnabled: boolean) => {
     try {
-      const response = await fetch("/api/reminders/toggle", {
+      const response = await apiFetch("/api/reminders/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, enabled: !currentlyEnabled })
@@ -467,7 +485,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
 
     // Call unified analysis pipeline endpoint
     try {
-      const resp = await fetch("/api/analyze-symptoms", {
+      const resp = await apiFetch("/api/analyze-symptoms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -482,7 +500,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
         setAiReport(aiOutput);
 
         // Feed the unified database using API Create
-        await fetch("/api/records", {
+        await apiFetch("/api/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -510,7 +528,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
     setHotFlashAlert(true);
     // Instant post to backend
     try {
-      await fetch("/api/records", {
+      await apiFetch("/api/records", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -549,7 +567,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
     setCheckoutSuccess(false);
 
     try {
-      const resp = await fetch("/api/purchase", {
+      const resp = await apiFetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -585,33 +603,33 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
   };
 
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs relative flex flex-col h-[780px] text-slate-800 font-sans">
+    <div className="w-full bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs relative flex flex-col h-auto lg:h-[780px] text-slate-800 font-sans">
       
       {/* 1. SMARTPHONE NOTCH HEADER */}
       <div className="bg-white px-6 pt-6 pb-4 flex justify-between items-center border-b border-slate-100 z-30 shrink-0">
-        <div className="flex items-center gap-1.5 font-bold uppercase tracking-tight text-xs text-rose-600">
-          <Heart className="w-4.5 h-4.5 fill-current animate-pulse text-rose-500" />
+        <div className="flex items-center gap-1.5 font-bold uppercase tracking-tight text-xs text-purple-650">
+          <Heart className="w-4.5 h-4.5 fill-current animate-pulse text-pink-500" />
           <span>{t.appTitle}</span>
         </div>
         <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
           <button 
             type="button"
             onClick={() => setLanguage('en')} 
-            className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition ${language === 'en' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
+            className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition cursor-pointer ${language === 'en' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
           >
             EN
           </button>
           <button 
             type="button"
             onClick={() => setLanguage('sn')} 
-            className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition ${language === 'sn' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
+            className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition cursor-pointer ${language === 'sn' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
           >
             SN
           </button>
           <button 
             type="button"
             onClick={() => setLanguage('nd')} 
-            className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition ${language === 'nd' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
+            className={`px-2 py-1 rounded-md text-[10px] font-mono font-bold transition cursor-pointer ${language === 'nd' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}
           >
             ND
           </button>
@@ -629,8 +647,8 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
       {showOnboarding ? (
         <div className="absolute inset-0 bg-white/98 z-40 flex flex-col justify-between p-6 overflow-y-auto text-slate-800">
           <div className="my-auto space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto mb-4 tag-sparkle shadow-sm">
-              <Sparkles className="w-8 h-8 text-rose-500" />
+            <div className="w-16 h-16 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center mx-auto mb-4 tag-sparkle shadow-sm">
+              <Sparkles className="w-8 h-8 text-purple-500 animate-pulse" />
             </div>
             
             <div className="text-center space-y-2">
@@ -638,16 +656,16 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
               <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto font-normal">{t.welcomeDesc}</p>
             </div>
 
-            <div className="space-y-3 pt-4">
-              <p className="text-center text-[10px] uppercase font-mono tracking-widest text-rose-500 font-bold">
+            <div className="space-y-3 pt-4 max-w-md mx-auto w-full">
+              <p className="text-center text-[10px] uppercase font-mono tracking-widest text-purple-600 font-bold">
                 {t.selectStage}
               </p>
               
               <button 
                 onClick={() => selectOnboardingStage('cycle')}
-                className="w-full bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 p-4 rounded-xl flex items-center gap-4 transition text-left"
+                className="w-full bg-slate-50 hover:bg-pink-50 border border-slate-200 hover:border-pink-200 p-4 rounded-xl flex items-center gap-4 transition text-left cursor-pointer"
               >
-                <div className="p-3 bg-rose-100/10 border border-rose-200/20 rounded-lg text-rose-500">
+                <div className="p-3 bg-pink-100/10 border border-pink-200/20 rounded-lg text-pink-500">
                   <Droplet className="w-6 h-6" />
                 </div>
                 <div>
@@ -658,9 +676,9 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
 
               <button 
                 onClick={() => selectOnboardingStage('recovery')}
-                className="w-full bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 p-4 rounded-xl flex items-center gap-4 transition text-left"
+                className="w-full bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 p-4 rounded-xl flex items-center gap-4 transition text-left cursor-pointer"
               >
-                <div className="p-3 bg-emerald-100/10 border border-emerald-200/20 rounded-lg text-emerald-600">
+                <div className="p-3 bg-purple-100/10 border border-purple-200/20 rounded-lg text-purple-600">
                   <Activity className="w-6 h-6" />
                 </div>
                 <div>
@@ -671,9 +689,9 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
 
               <button 
                 onClick={() => selectOnboardingStage('balance')}
-                className="w-full bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 p-4 rounded-xl flex items-center gap-4 transition text-left"
+                className="w-full bg-slate-50 hover:bg-fuchsia-50 border border-slate-200 hover:border-fuchsia-200 p-4 rounded-xl flex items-center gap-4 transition text-left cursor-pointer"
               >
-                <div className="p-3 bg-amber-100/10 border border-amber-200/20 rounded-lg text-amber-600">
+                <div className="p-3 bg-fuchsia-100/10 border border-fuchsia-200/20 rounded-lg text-fuchsia-600">
                   <Flame className="w-6 h-6" />
                 </div>
                 <div>
@@ -684,9 +702,9 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
 
               <button 
                 onClick={() => selectOnboardingStage('endo')}
-                className="w-full bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 p-4 rounded-xl flex items-center gap-4 transition text-left"
+                className="w-full bg-slate-50 hover:bg-violet-50 border border-slate-200 hover:border-violet-200 p-4 rounded-xl flex items-center gap-4 transition text-left cursor-pointer"
               >
-                <div className="p-3 bg-purple-100/10 border border-purple-200/20 rounded-lg text-purple-600">
+                <div className="p-3 bg-violet-100/10 border border-violet-200/20 rounded-lg text-violet-600">
                   <Award className="w-6 h-6" />
                 </div>
                 <div>
@@ -704,7 +722,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
       ) : null}
 
       {/* 3. SCROLLABLE APP BODY */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6 pb-24 bg-slate-50/50">
+      <div className="flex-1 overflow-visible lg:overflow-y-auto px-4 sm:px-5 py-4 space-y-6 pb-24 bg-slate-50/50">
         
         {/* LIFE STAGE BANNER */}
         <div className="bg-white p-3.5 rounded-2xl border border-slate-150 shadow-sm flex items-center justify-between">
@@ -810,10 +828,10 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
                   <div key={ex.name} className="p-3 bg-emerald-50/40 border border-emerald-100 rounded-xl flex items-center justify-between gap-2.5 transition hover:bg-emerald-50 hover:shadow-xs">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-bold text-emerald-800 truncate">{ex.name}</span>
-                        <span className="text-[8px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 font-bold uppercase rounded font-mono">2 min</span>
+                        <span className="text-[11px] font-bold text-emerald-800 leading-tight mt-0.5 break-words whitespace-normal">{ex.name}</span>
+                        <span className="text-[8px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 font-bold uppercase rounded font-mono shrink-0">2 min</span>
                       </div>
-                      <p className="text-[9.5px] text-slate-500 leading-normal font-light truncate mt-0.5">{ex.desc}</p>
+                      <p className="text-[9.5px] text-slate-500 leading-relaxed font-light mt-0.5 break-words whitespace-normal">{ex.desc}</p>
                       <span className="text-[8.5px] text-emerald-600 italic block mt-0.5 font-sans font-medium">Benefit: {ex.benefit}</span>
                     </div>
                     <button 
@@ -874,7 +892,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
                           onClick={() => {
                             setHotFlashTrigger(trig);
                             // Submit a silent backache/flash record with the trigger!
-                            fetch("/api/records", {
+                            apiFetch("/api/records", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
@@ -1771,7 +1789,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
                     <span className="text-[8px] bg-slate-100 border border-slate-250 px-1.5 py-0.5 rounded tracking-wide text-rose-600 uppercase font-mono font-bold">
                       {episode.category}
                     </span>
-                    <h4 className="text-[10.5px] font-bold text-slate-900 truncate mt-1">
+                    <h4 className="text-[10.5px] font-bold text-slate-900 mt-1 break-words whitespace-normal leading-tight">
                       {discreetMode ? `Track ${episode.id.toUpperCase()} - Private Session` : episode.title[language]}
                     </h4>
                     <p className="text-[9px] text-slate-400">{episode.speaker} • {episode.duration}</p>
@@ -2077,12 +2095,134 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
         </div>
 
         {/* ======================================================== */}
+        {/* PARTNER SHARING SECURITY CONNECTIONS TERMINAL           */}
+        {/* ======================================================== */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm space-y-4 font-sans text-left">
+          <div className="flex justify-between items-center select-none border-b border-rose-100 pb-2.5">
+            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+              <span className="p-1.5 bg-rose-50 text-rose-500 rounded-lg"><Users className="w-4 h-4" /></span>
+              <span>Partner Sync Terminal</span>
+            </h3>
+            <span className={`px-2 py-0.5 text-[8.5px] font-bold uppercase rounded-full ${partnerSyncActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400'}`}>
+              {partnerSyncActive ? "● Syncing" : "Paused"}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              {language === 'sn' 
+                ? "Nezvirongwa izvi, unogona kupa mvumo yakachengeteka yekugovana manotsi ako nemurume kana mudiwa wako munguva chaiyo (real-time). Shandisa mabhatani aya kudzora zvunotumirwa."
+                : language === 'nd'
+                ? "Ngalezi zinhlelo, ungaba lokuphana imvumo yokugovana inhlobo zempilakahle lomyalelo lowo ologovana laye ngesikhathi sakhona."
+                : "Securely delegate real-time wellness, pain level, and traditional remedy logs to your chosen partner. Use the safety toggle switches below to control exactly which records are synchronized at any time."}
+            </p>
+
+            {/* KEY TOGGLES CONTAINER */}
+            <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 space-y-2.5">
+              <div className="flex justify-between items-center select-none">
+                <span className="text-[10px] font-bold text-slate-700">📶 {language === 'sn' ? 'Gonesa Kugovana mune Real-time' : 'Enable Real-time Sharing'}</span>
+                <button 
+                  type="button" 
+                  onClick={() => setPartnerSyncActive(!partnerSyncActive)}
+                  className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${partnerSyncActive ? 'bg-rose-500 flex justify-end animate-pulse' : 'bg-slate-200 flex justify-start'}`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-white shadow-xs" />
+                </button>
+              </div>
+
+              {partnerSyncActive && (
+                <div className="border-t border-slate-200/50 pt-2.5 mt-2 space-y-2.5 animate-fadeIn">
+                  <div className="flex justify-between items-center select-none">
+                    <div>
+                      <span className="text-[9.5px] font-bold text-slate-800 block">📊 {language === 'sn' ? 'Kugovana Marwadzo (Scale)' : 'Share Pain Scale Logs'}</span>
+                      <span className="text-[8px] text-slate-400 block font-normal">Real-time intensity metrics</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setPartnerShareIntensity(!partnerShareIntensity)}
+                      className={`w-7 h-4 rounded-full p-0.5 transition-colors cursor-pointer ${partnerShareIntensity ? 'bg-rose-500' : 'bg-slate-200'}`}
+                    >
+                      <span className={`w-3 h-3 rounded-full bg-white shadow-xs block transform transition ${partnerShareIntensity ? 'translate-x-3' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  <div className="flex justify-between items-center select-none">
+                    <div>
+                      <span className="text-[9.5px] font-bold text-slate-800 block">🤢 {language === 'sn' ? 'Kugovana Zviratidzo (Symptoms)' : 'Share Physical Symptoms'}</span>
+                      <span className="text-[8px] text-slate-400 block font-normal">Standardized symptom logs</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setPartnerShareSymptoms(!partnerShareSymptoms)}
+                      className={`w-7 h-4 rounded-full p-0.5 transition-colors cursor-pointer ${partnerShareSymptoms ? 'bg-rose-500' : 'bg-slate-200'}`}
+                    >
+                      <span className={`w-3 h-3 rounded-full bg-white shadow-xs block transform transition ${partnerShareSymptoms ? 'translate-x-3' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  <div className="flex justify-between items-center select-none">
+                    <div>
+                      <span className="text-[9.5px] font-bold text-slate-800 block">🍵 {language === 'sn' ? 'Kugovana mishonga miduku' : 'Share Remedies & Subscriptions'}</span>
+                      <span className="text-[8px] text-slate-400 block font-normal font-sans">Tea dosage & current patch status</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setPartnerShareProducts(!partnerShareProducts)}
+                      className={`w-7 h-4 rounded-full p-0.5 transition-colors cursor-pointer ${partnerShareProducts ? 'bg-rose-500' : 'bg-slate-200'}`}
+                    >
+                      <span className={`w-3 h-3 rounded-full bg-white shadow-xs block transform transition ${partnerShareProducts ? 'translate-x-3' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  <div className="flex justify-between items-center select-none">
+                    <div>
+                      <span className="text-[9.5px] font-bold text-slate-800 block">🏫 {language === 'sn' ? 'Kugovana zveKusara Chikoro' : 'Share Absenteeism Notes'}</span>
+                      <span className="text-[8px] text-slate-400 block font-normal">Missed school/work days warning alert</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setPartnerShareDaysMissed(!partnerShareDaysMissed)}
+                      className={`w-7 h-4 rounded-full p-0.5 transition-colors cursor-pointer ${partnerShareDaysMissed ? 'bg-rose-500' : 'bg-slate-200'}`}
+                    >
+                      <span className={`w-3 h-3 rounded-full bg-white shadow-xs block transform transition ${partnerShareDaysMissed ? 'translate-x-3' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* SYNC CONNECTION INFORMATION */}
+            <div className="p-3 bg-gradient-to-br from-rose-50/10 to-rose-50/30 border border-rose-100 rounded-xl space-y-2 select-none">
+              <div className="flex justify-between items-center">
+                <span className="text-[8.5px] text-rose-500 font-extrabold uppercase tracking-widest font-mono">Dual-View Connection Ledger</span>
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[10.5px]">
+                <span className="text-slate-500">{language === 'sn' ? 'Mudiwa akasunganidzwa:' : 'Linked Partner:'}</span>
+                <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                  🧑🏽‍💻 {partnerLinkedName}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[10.5px] border-t border-slate-100 pt-1.5 mt-1">
+                <span className="text-slate-500">{language === 'sn' ? 'Kodhi Yekusanganisa:' : 'Your Invited Key code:'}</span>
+                <span className="font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded font-extrabold text-slate-600 text-xs">
+                  {partnerLinkCode}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================== */}
         {/* NO-SHAME KNOWLEDGE BASE & SISTERHOOD FORUMS              */}
         {/* ======================================================== */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-150 shadow-sm space-y-4">
-          <div className="flex justify-between items-center select-none border-b border-slate-55 pb-2">
-            <h3 className="text-xs font-bold text-rose-600 uppercase tracking-wide flex items-center gap-1.5">
-              <Heart className="w-4 h-4 text-rose-500" />
+        <div className="bg-white p-4 rounded-2xl border border-slate-150 shadow-sm space-y-4 font-sans text-left">
+          <div className="flex justify-between items-center select-none border-b border-rose-100 pb-2">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+              <span className="p-1 bg-rose-50 text-rose-500 rounded-md"><Heart className="w-4 h-4 text-rose-500" /></span>
               <span>No-Shame Hub & Anonymous Forum</span>
             </h3>
             <span className="px-2 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 text-[8px] font-mono font-bold tracking-wider uppercase rounded">
@@ -2097,7 +2237,7 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
                 key={tab}
                 type="button"
                 onClick={() => setForumCategory(tab)}
-                className={`flex-1 py-1 px-1.5 rounded-lg text-[9.5px] font-extrabold uppercase transition tracking-wider ${
+                className={`flex-1 py-1 px-1.5 rounded-lg text-[9.5px] font-extrabold uppercase transition tracking-wider cursor-pointer ${
                   (forumCategory === tab || (forumCategory !== 'faq' && forumCategory !== 'forum' && tab === 'forum'))
                     ? 'bg-rose-500 text-white shadow-xs' 
                     : 'text-slate-500 hover:text-slate-800'
@@ -2119,11 +2259,11 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
                 {[
                   {
                     q: language === 'sn' ? "Ndizvo zvakajairika here kurwadziwa zvakanyanya panguva kwekutevera?" : language === 'nd' ? "Kubuhlungu kakhulu yini ukuba semfuleni?" : "Is severe, crippling pain a normal part of menstruation?",
-                    ans: language === 'sn' ? "Aiwa, marwadzo anokutadzisa kuenda kuchikoro kana kubasa (dysmenorrhea) haasi ekurarama nawo. Chigamba chePatch It chinorwisa marwadzo aya kuitira kuti urarame hupenyu hwakasununguka." : language === 'nd' ? "Hatshi, ubuhlungu obukuvimbisa ukuya esikolweni kumbe emsebenzini (dysmenorrhea) akungobokwamukela njalo. Isichibi se-Patch It sidambisa lobu buhlungu ukuze usebenze ukhululekile." : "No. Crippling period pain that keeps girls out of school is a medical condition (dysmenorrhea). It is treatable and preventable. Using Patch It local transdermal patches calms inflammation."
+                    ans: language === 'sn' ? "Aiwa, marwadzo anokutadzisa kuenda kuchikoro kana kubasa (dysmenorrhea) haasi ekurarama nawo. Chigamba chePatch It chinorwisa marwadzo aya kuitira kuti urarame hupenyu hwakasununguka." : language === 'nd' ? "Hatshi, ubuhlungu obukuvimbisa ukuya esikolweni kumbe emsebenzini (dysmenorrhea) akungobokwamukela njalo. Isichibi se-Patch It sidambisa lobu buhlungu ukuze usebenze ukhululekile." : "No. period pain that keeps girls out of school is a medical condition (dysmenorrhea). It is treatable and preventable. Using Patch It local transdermal patches calms inflammation."
                   },
                   {
                     q: language === 'sn' ? "Chii chinonzi postpartum 'lochia' uye zvakajairika?" : language === 'nd' ? "Kuyini 'lochia' emva kokubeletha njalo kujwayelekile yini?" : "What is postpartum 'lochia' and uterine retraction?",
-                    ans: language === 'sn' ? "Lochia ndiko kubuda kweropa nemvura zvakajairika mushure mekusununguka apo chibereko chiri kudzokera parugwaro (involution). Kushandisa mabhande anopisa (Heating Belts) kunodzivirira marwadzo emhasuru aya panguva yekupora." : language === 'nd' ? "Lochia yikuphuma kwegazi lejusi emva kokubeletha okuvamileyo lapho isizalo sibuyela esimweni saso (involution). Ukusebenzisa ibhande elihambisa ukufudumala kudambisa lokhu kulimala." : "Lochia is normal postpartum discharge as your uterus shrinks back to its pre-pregnancy size (involution). Gentle pelvic breathing and our Warming Belt safely speed up muscular tissue repair and core recovery."
+                    ans: language === 'sn' ? "Lochia ndiko kubuda kweropa nemvura zvakajairika mushure mekusununguka apo chibereko chiri kudzokera parugwaro (involution). Kushandisa mabhande anopisa (Heating Belts) kunodzivirira marwadzo emhasuru aya panguva yekupora." : language === 'nd' ? "Lochia yikuphuma kwegazi lejusi emva kokubeletha okuvamileyo lapho isizalo sibuyela esimweni saso (involution). Ukusebenzisa ibhande elihambisa ukufudumala kudambisa lokhu kulimala." : "Lochia is normal postpartum discharge as your uterus shrinks back to its size. Gentle pelvic breathing and our Warming Belt safely speed up muscular tissue repair."
                   },
                   {
                     q: language === 'sn' ? "Sei ndichinzwa kupisa muviri kuMenopause, ingava n'anga here?" : language === 'nd' ? "Kungani ngizwa ukutshisa komzimba kakhulu ku-Menopause, kuyisintu yini?" : "Why do I experience spontaneous hot flashes during menopause?",
@@ -2143,41 +2283,71 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
               </div>
             </div>
           ) : (
-            /* TAB CONTENT: ANONYMOUS SISTERHOOD FORUMS */
-            <div className="space-y-3 text-left">
+            /* TAB CONTENT: SISTERHOOD FORUMS IN DYNAMIC TAG FILTER MODE */
+            <div className="space-y-3.5 text-left">
               <span className="text-[9.5px] text-slate-400 font-bold block uppercase tracking-wider font-mono">
-                Anonymized Peer Support Council:
+                Safe Peer-to-Peer Experiences:
               </span>
+
+              {/* HORIZONTAL TAG FILTER RAILS */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 select-none scrollbar-none max-w-full">
+                {["all", "cramps", "traditional", "zumbani", "postpartum", "menopause", "remedy"].map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setForumFilterTag(tag)}
+                    className={`px-2.5 py-0.8 rounded-full text-[8.5px] font-bold uppercase tracking-wider transition shrink-0 cursor-pointer ${
+                      forumFilterTag === tag
+                        ? 'bg-rose-500 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {tag === 'all' ? "✨ All Feeds" : `#${tag}`}
+                  </button>
+                ))}
+              </div>
 
               {/* POSTS LISTING */}
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {dbState.forumPosts && dbState.forumPosts.length > 0 ? (
-                  dbState.forumPosts.map((post: any) => (
-                    <div key={post.id} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
-                      <div className="flex justify-between items-center text-[8px] font-mono font-bold select-none">
-                        <span className="px-1.5 py-0.5 bg-slate-200/50 text-slate-600 rounded">
-                          🔒 Anonymous • {post.author}
-                        </span>
-                        <span className="text-slate-400">
-                          {new Date(post.timestamp).toLocaleDateString()}
-                        </span>
+                  dbState.forumPosts
+                    .filter((post: any) => {
+                      if (forumFilterTag === "all") return true;
+                      return post.tags && post.tags.includes(forumFilterTag);
+                    })
+                    .map((post: any) => (
+                      <div key={post.id} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl space-y-1">
+                        <div className="flex justify-between items-center text-[8px] font-mono font-bold select-none">
+                          <span className="px-1.5 py-0.5 bg-rose-55 border border-rose-200/55 text-rose-600 rounded">
+                            {post.author.toLowerCase().startsWith('sister-') || post.author.toLowerCase().startsWith('mother-') || post.author.toLowerCase().includes('site-admin') ? '🔒' : '👤'} {post.author}
+                          </span>
+                          <span className="text-slate-400">
+                            {new Date(post.timestamp).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-700 leading-snug font-light whitespace-pre-line select-text">
+                          {post.text}
+                        </p>
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-200/30 text-[9px] select-none">
+                          <div className="flex flex-wrap gap-1">
+                            <span className="px-1 py-0.5 bg-slate-200 text-slate-600 text-[7px] font-mono font-bold uppercase rounded">
+                              {post.category || "General"}
+                            </span>
+                            {post.tags && post.tags.map((t: string) => (
+                              <span key={t} className="px-1 py-0.5 bg-rose-55 border border-rose-100/30 text-rose-500 text-[7px] font-mono rounded">
+                                #{t}
+                              </span>
+                            ))}
+                          </div>
+                          <button className="text-slate-400 hover:text-rose-500 flex items-center gap-1 font-mono text-[8px]">
+                            ❤️ <span>{post.likes} likes</span>
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-[10px] text-slate-700 leading-snug font-light whitespace-pre-line select-text">
-                        {post.text}
-                      </p>
-                      <div className="flex justify-between items-center pt-1 border-t border-slate-200/30 text-[9px] select-none">
-                        <span className="px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 text-[7px] font-bold uppercase rounded tracking-wider font-sans">
-                          {post.category || "General"}
-                        </span>
-                        <button className="text-slate-400 hover:text-rose-500 flex items-center gap-1 font-mono">
-                          ❤️ <span>{post.likes} likes</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    ))
                 ) : (
                   <div className="text-center py-4 text-[10px] text-slate-400 font-light italic">
-                    Loading Sisterhood board... Ensure you're connected.
+                    No feeds tagged under #{forumFilterTag} yet... Be the first!
                   </div>
                 )}
               </div>
@@ -2192,22 +2362,57 @@ export default function CompanionApp({ language, setLanguage, dbState, onRefresh
                       ? "Nyora ruzivo kana mhinduro yako pano yehunhu pasina anoziva..." 
                       : language === 'nd'
                       ? "Bhala imfihlo yakho kumbe usizo lapha ngasese..."
-                      : "Share an experience or ask a question completely anonymously (e.g. cramps, hot flashes)..."
+                      : "Share an experience or ask a question completely anonymously or custom..."
                   }
                   maxLength={250}
                   className="w-full bg-slate-50 border border-slate-200 hover:border-slate-350 focus:border-rose-450 rounded-xl p-2.5 text-[10.5px] text-slate-800 outline-none placeholder-slate-400 transition h-14 resize-none shadow-inner font-light"
                 />
+
+                {/* USERNAME & CHIPS SELECTOR IN ROW */}
+                <div className="grid grid-cols-2 gap-2 mt-1.5 p-2 bg-slate-50 border border-slate-150 rounded-xl">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono uppercase text-slate-400 font-extrabold block">👤 Custom Handle / Nickname:</label>
+                    <input 
+                      type="text" 
+                      value={forumUsername} 
+                      onChange={(e) => setForumUsername(e.target.value)} 
+                      placeholder="Leave empty for Anonymous"
+                      className="w-full bg-white border border-slate-200 p-1.5 rounded-lg text-[9px] font-mono outline-none focus:border-rose-450"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono uppercase text-slate-400 font-extrabold block">🏷️ Select Thread Tags:</label>
+                    <div className="flex flex-wrap gap-0.5 max-h-12 overflow-y-auto">
+                      {["cramps", "traditional", "zumbani", "postpartum", "menopause", "remedy"].map(tag => {
+                        const isS = forumSelectedTags.includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              if (isS) setForumSelectedTags(prev => prev.filter(t => t !== tag));
+                              else setForumSelectedTags(prev => [...prev, tag]);
+                            }}
+                            className={`px-1 rounded text-[7px] font-mono border transition shrink-0 cursor-pointer ${isS ? 'bg-rose-500 text-white border-rose-500 font-extrabold shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:text-slate-650'}`}
+                          >
+                            #{tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
                 
-                <div className="flex justify-between items-center select-none">
-                  <span className="text-[8.5px] text-slate-400 font-sans italic">
-                    Signed anonymously as <strong>{lifeStage === 'recovery' ? 'Mother' : 'Sister'}-***</strong>
+                <div className="flex justify-between items-center select-none pt-1">
+                  <span className="text-[8px] text-slate-400 font-sans italic">
+                    Signed as <strong>{forumUsername.trim() || `${lifeStage === 'recovery' ? 'Mother' : 'Sister'}-***`}</strong>
                   </span>
                   <button 
                     type="submit"
                     disabled={forumLoading || !forumInput.trim()}
                     className="bg-rose-500 hover:bg-rose-600 text-white font-bold uppercase px-4 py-1.5 rounded-lg text-[9px] tracking-wide transition active:scale-95 disabled:opacity-40 shadow-sm cursor-pointer"
                   >
-                    {forumLoading ? "Saving..." : "Post Anonymously"}
+                    {forumLoading ? "Saving..." : "Share Experience"}
                   </button>
                 </div>
               </form>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { MessageSquare, Send, CheckCheck } from "lucide-react";
 import { Language, ChatMessage } from "../types";
 import { LOCAL_TRANSLATIONS } from "../data";
+import { apiFetch } from "../utils/apiFetch";
 
 interface WhatsappSimulatorProps {
   language: Language;
@@ -64,7 +65,7 @@ export default function WhatsappSimulator({ language, onRefresh }: WhatsappSimul
 
     // 2. Fetch bot's reply from API endpoint
     try {
-      const resp = await fetch("/api/whatsapp-chat", {
+      const resp = await apiFetch("/api/whatsapp-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

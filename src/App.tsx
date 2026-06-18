@@ -23,6 +23,7 @@ import UssdSimulator from "./components/UssdSimulator";
 import WhatsappSimulator from "./components/WhatsappSimulator";
 import { Language, PainRecord, PatchReminder } from "./types";
 import { LOCAL_TRANSLATIONS } from "./data";
+import { apiFetch, offlineState } from "./utils/apiFetch";
 
 export default function App() {
   const [language, setLanguage] = useState<Language>('en');
@@ -98,7 +99,7 @@ export default function App() {
   // Fetch updated dashboard state from Express server
   const fetchDashboardState = async () => {
     try {
-      const resp = await fetch("/api/dashboard");
+      const resp = await apiFetch("/api/dashboard");
       if (resp.ok) {
         const data = await resp.json();
         setDbState(data);
@@ -128,7 +129,7 @@ export default function App() {
     try {
       // 1. Sync Records
       for (const rec of offlineRecords) {
-        await fetch("/api/records", {
+        await apiFetch("/api/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(rec)
@@ -137,7 +138,7 @@ export default function App() {
 
       // 2. Sync Forum Posts
       for (const fp of offlineForumPosts) {
-        await fetch("/api/forum", {
+        await apiFetch("/api/forum", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: fp.text, category: fp.category })
@@ -146,7 +147,7 @@ export default function App() {
 
       // 3. Sync E-commerce Orders
       for (const order of offlineOrders) {
-        await fetch("/api/purchase", {
+        await apiFetch("/api/purchase", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(order)
@@ -172,10 +173,10 @@ export default function App() {
   // HYBRID FETCH PROXY INTERCEPTOR:
   // Dynamically reroutes all backend POST/GET requests to client memory/localStorage when offline
   useEffect(() => {
-    const originalFetch = window.fetch;
+    offlineState.isOffline = isOfflineSimulated;
 
     if (isOfflineSimulated) {
-      window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      offlineState.handleFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
         const urlStr = typeof input === "string" ? input : (input instanceof URL ? input.href : input.url);
         
         // Parse the endpoint and params
@@ -518,8 +519,10 @@ export default function App() {
       };
 
       return () => {
-        window.fetch = originalFetch;
+        offlineState.handleFetch = null;
       };
+    } else {
+      offlineState.handleFetch = null;
     }
   }, [isOfflineSimulated, offlineRecords, offlineForumPosts, offlineOrders, dbState, ussdMenuPath, ussdLanguage, ussdTempPain, waMessages]);
 
@@ -554,18 +557,18 @@ export default function App() {
       <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-emerald-500/[0.03] rounded-full blur-3xl pointer-events-none z-0" />
 
       {/* TOP SYSTEM BAR: CONNECTION STATUS SLIM LINE */}
-      <div className="w-full max-w-6xl z-10 shrink-0">
+      <div className="w-full max-w-7xl z-10 shrink-0">
         <div className={`w-full px-5 py-2.5 rounded-2xl border flex flex-col sm:flex-row justify-between items-center gap-3 transition-all duration-350 ${
           isOfflineSimulated 
             ? 'bg-amber-50/90 border-amber-200 text-amber-900 shadow-sm shadow-amber-500/5' 
             : 'bg-white border-slate-200 shadow-sm text-slate-700'
         }`}>
-          <div className="flex items-center gap-2.5 text-xs">
-            <span className="flex h-2.5 w-2.5 relative">
+          <div className="flex items-center gap-2.5 text-xs text-left">
+            <span className="flex h-2.5 w-2.5 relative shrink-0">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isOfflineSimulated ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
               <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOfflineSimulated ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
             </span>
-            <span className="font-medium font-mono text-[10.5px] uppercase tracking-wider">
+            <span className="font-semibold font-mono text-[10.5px] uppercase tracking-wider">
               {isOfflineSimulated ? (
                 <span>⚠️ Local Heuristic Cache Mode Active (Zimbabwe Telecom Outage Emulation)</span>
               ) : (
@@ -574,11 +577,11 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3 font-mono text-xs w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-3 font-mono text-xs w-full sm:w-auto justify-end shrink-0">
             {/* OFFLINE / ONLINE TOGGLE BUTTON */}
             <button
               onClick={toggleOfflineSimulation}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 border shadow-sm cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 border shadow-sm cursor-pointer shrink-0 ${
                 isOfflineSimulated
                   ? 'bg-amber-600 border-amber-700 text-white hover:bg-amber-700 shadow-amber-600/10'
                   : 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800'
@@ -602,7 +605,7 @@ export default function App() {
               <button
                 onClick={syncOfflineQueue}
                 disabled={isOfflineSimulated || isSyncingOffline}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition flex items-center gap-1.5 border ${
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition flex items-center gap-1.5 border shrink-0 ${
                   isOfflineSimulated
                     ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 hover:border-emerald-600 cursor-pointer animate-pulse'
@@ -623,20 +626,20 @@ export default function App() {
       </div>
 
       {/* HEADER BAR & NAV CONTROLS INTERLOCK */}
-      <div className="w-full max-w-6xl bg-white border border-slate-200 rounded-[30px] p-5 md:p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm z-10 shrink-0 select-text">
+      <div className="w-full max-w-7xl bg-white border border-slate-200 rounded-[30px] p-5 md:p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm z-10 shrink-0 select-text">
         
         {/* BRAND BLOCK */}
         <div className="space-y-1 text-left">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 bg-gradient-to-tr from-rose-500 to-rose-400 rounded-2xl flex items-center justify-center text-white font-extrabold text-xl shadow-xs">
+            <span className="w-10 h-10 bg-gradient-to-tr from-purple-650 to-pink-500 rounded-2xl flex items-center justify-center text-white font-extrabold text-xl shadow-xs shrink-0">
               P
             </span>
             <div>
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <h1 className="text-xl font-black tracking-tight text-slate-900 leading-none">
                   Patch It
                 </h1>
-                <span className="text-rose-500 font-bold text-[10px] uppercase px-2 py-0.5 bg-rose-50 border border-rose-100 rounded-full">
+                <span className="text-purple-600 font-bold text-[10px] uppercase px-2 py-0.5 bg-purple-50 border border-purple-100 rounded-full">
                   Wellness
                 </span>
                 <span className="text-slate-400 font-mono text-[9px] font-bold tracking-widest bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase">
@@ -651,12 +654,12 @@ export default function App() {
         </div>
 
         {/* PREMIUM HORIZONTAL TAB SYSTEM */}
-        <div className="flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/50 w-full lg:w-auto font-mono text-[11px] uppercase font-black">
+        <div className="flex flex-wrap sm:flex-nowrap gap-1.5 sm:gap-0 items-center bg-slate-100/80 p-1.5 sm:p-1 rounded-2xl border border-slate-200/50 w-full lg:w-auto font-mono text-[11px] uppercase font-black">
           <button
             onClick={() => setActiveTab('app')}
-            className={`flex-1 lg:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
+            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
               activeTab === 'app'
-                ? 'bg-white text-rose-600 shadow-sm font-bold'
+                ? 'bg-white text-purple-600 shadow-sm font-bold'
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
@@ -666,9 +669,9 @@ export default function App() {
           
           <button
             onClick={() => setActiveTab('telecom')}
-            className={`flex-1 lg:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
+            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
               activeTab === 'telecom'
-                ? 'bg-white text-rose-600 shadow-sm font-bold'
+                ? 'bg-white text-purple-600 shadow-sm font-bold'
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
@@ -678,9 +681,9 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('database')}
-            className={`flex-1 lg:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
+            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition duration-200 ${
               activeTab === 'database'
-                ? 'bg-white text-rose-600 shadow-sm font-bold'
+                ? 'bg-white text-purple-600 shadow-sm font-bold'
                 : 'text-slate-500 hover:text-slate-900'
             }`}
           >
@@ -692,7 +695,7 @@ export default function App() {
 
       {/* RURAL ACCESSIBILITY PROTOCOL BANNER IF ITEMS QUEUED */}
       {(offlineRecords.length + offlineForumPosts.length + offlineOrders.length) > 0 && (
-        <div className="w-full max-w-6xl -mt-2 z-10 shrink-0">
+        <div className="w-full max-w-7xl -mt-2 z-10 shrink-0">
           <div className="bg-amber-500/[0.08] hover:bg-amber-500/[0.12] border border-amber-200/60 rounded-2xl px-5 py-3.5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left transition duration-200">
             <div className="space-y-0.5">
               <span className="text-[10px] font-mono tracking-wider font-extrabold text-amber-800 uppercase block">Local Queue Status</span>
@@ -718,7 +721,7 @@ export default function App() {
       )}
 
       {/* CORE WORKSPACE VIEW */}
-      <div className="w-full max-w-6xl z-10 select-text flex-1">
+      <div className="w-full max-w-7xl z-10 select-text flex-1">
         
         {/* -------------------- TAB 1: SMARTPHONE APP VIEW -------------------- */}
         {activeTab === 'app' && (
@@ -728,8 +731,8 @@ export default function App() {
             <div className="lg:col-span-7 flex flex-col w-full">
               
               <div className="text-left mb-3">
-                <span className="text-[10px] tracking-widest font-mono text-rose-500 font-extrabold uppercase">
-                  💖 PATCH IT COMPANION HUB
+                <span className="text-[10px] tracking-widest font-mono text-purple-600 font-extrabold uppercase animate-pulse">
+                  💜 PATCH IT COMPANION HUB
                 </span>
               </div>
 
@@ -743,11 +746,11 @@ export default function App() {
 
             </div>
 
-            {/* EDUCATIONAL CASE MODULE (RIGHT) */}
-            <div className="lg:col-span-5 space-y-6 text-left">
+            {/* EDUCATIONAL CASE MODULE (RIGHT) - Hidden on Mobile by default */}
+            <div className="hidden lg:block lg:col-span-5 space-y-6 text-left">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-mono text-rose-500 font-extrabold uppercase tracking-widest">Accessibility Concept</span>
+                  <span className="text-[10px] font-mono text-purple-600 font-extrabold uppercase tracking-widest">Accessibility Concept</span>
                   <h2 className="text-xl font-black text-slate-900 tracking-tight">
                     The Zimbabwe Rural Health Accessibility Map
                   </h2>
@@ -759,7 +762,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Flame className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <Flame className="w-4.5 h-4.5 text-purple-600 shrink-0" />
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Cyclic Thermal Relief</h4>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed font-light">
@@ -769,7 +772,7 @@ export default function App() {
 
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Droplet className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <Droplet className="w-4.5 h-4.5 text-pink-500 shrink-0" />
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">AI Local Tea Classifier</h4>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed font-light">
@@ -779,7 +782,7 @@ export default function App() {
 
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Activity className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <Activity className="w-4.5 h-4.5 text-purple-600 shrink-0" />
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Pain Screenings</h4>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed font-light">
@@ -789,7 +792,7 @@ export default function App() {
 
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Users className="w-4.5 h-4.5 text-rose-500 shrink-0" />
+                      <Users className="w-4.5 h-4.5 text-pink-500 shrink-0" />
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Subsidized Redistribution</h4>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed font-light">
@@ -810,7 +813,7 @@ export default function App() {
               </div>
 
               {/* BRIEF OFF-GRID INSTRUCTIONS WRAPPER */}
-              <div className="bg-gradient-to-tr from-slate-900 to-slate-800 p-6 rounded-3xl text-left text-white border border-slate-950 space-y-2.5">
+              <div className="hidden lg:block bg-gradient-to-tr from-slate-900 to-slate-800 p-6 rounded-3xl text-left text-white border border-slate-950 space-y-2.5">
                 <h3 className="text-xs font-mono uppercase tracking-widest text-rose-400 font-extrabold flex items-center gap-2">
                   <span>How to Test Offline Caching resilience:</span>
                 </h3>

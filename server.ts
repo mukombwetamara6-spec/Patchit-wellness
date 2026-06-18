@@ -116,9 +116,9 @@ const db: LocalDB = {
     { id: "rem-2", type: "gel", title: { en: "Apply Pain Relief Gel", sn: "Zora Mafuta Anozorodza", nd: "Sula Amafuta Okuphelisa Ubuhlungu" }, enabled: false, intervalHours: 6, lastChanged: new Date(Date.now() - 1.2 * 3600000).toISOString() }
   ],
   forumPosts: [
-    { id: "fp-1", author: "Sister-742", text: "Zumbani tea really calms menstrual cramps combined with the heating belt. Has anyone else tried this?", timestamp: new Date(Date.now() - 5 * 3600000).toISOString(), likes: 24, category: "cycle" },
-    { id: "fp-2", author: "Mother-385", text: "Uterine involution tips: Warm Makoni tea + 20 mins light horizontal breathing is amazing postpartum. Highly recommend the safe belt timer!", timestamp: new Date(Date.now() - 12 * 3600000).toISOString(), likes: 18, category: "recovery" },
-    { id: "fp-3", author: "Sister-901", text: "Menopause sweats are tough, especially around 3am. I'm keeping my Cooling Belt inserts ready. Complete game changer!", timestamp: new Date(Date.now() - 2 * 3600000).toISOString(), likes: 32, category: "balance" }
+    { id: "fp-1", author: "Sister-742", text: "Zumbani tea really calms menstrual cramps combined with the heating belt. Has anyone else tried this?", timestamp: new Date(Date.now() - 5 * 3600000).toISOString(), likes: 24, category: "cycle", tags: ["cramps", "traditional", "zumbani"] },
+    { id: "fp-2", author: "Mother-385", text: "Uterine involution tips: Warm Makoni tea + 20 mins light horizontal breathing is amazing postpartum. Highly recommend the safe belt timer!", timestamp: new Date(Date.now() - 12 * 3600000).toISOString(), likes: 18, category: "recovery", tags: ["postpartum", "makoni", "remediation"] },
+    { id: "fp-3", author: "Sister-901", text: "Menopause sweats are tough, especially around 3am. I'm keeping my Cooling Belt inserts ready. Complete game changer!", timestamp: new Date(Date.now() - 2 * 3600000).toISOString(), likes: 32, category: "balance", tags: ["menopause", "cooling", "sweats"] }
   ]
 };
 
@@ -189,10 +189,10 @@ app.get("/api/forum", (req, res) => {
   res.json({ posts: db.forumPosts });
 });
 
-// Create a new anonymized forum post
+// Create a new anonymized or custom username forum post
 app.post("/api/forum", (req, res) => {
   try {
-    const { text, category } = req.body;
+    const { text, category, username, tags } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "Post content is required" });
     }
@@ -200,17 +200,24 @@ app.post("/api/forum", (req, res) => {
     const prefixes = {
       cycle: "Sister-",
       recovery: "Mother-",
-      balance: "Sister-"
+      balance: "Sister-",
+      endo: "EndoSister-"
     };
     const prefix = prefixes[category as keyof typeof prefixes] || "Sister-";
     
+    // Use chosen custom username if present, otherwise anonymized sequence name
+    const finalAuthor = username && username.trim() ? username.trim() : `${prefix}${idNum}`;
+    
+    const parsedTags = Array.isArray(tags) ? tags : [];
+
     const newPost = {
       id: "fp-" + Date.now(),
-      author: `${prefix}${idNum}`,
+      author: finalAuthor,
       text: text || "",
       timestamp: new Date().toISOString(),
       likes: 0,
-      category: category || "cycle"
+      category: category || "cycle",
+      tags: parsedTags
     };
 
     db.forumPosts.unshift(newPost); // Add at the beginning
@@ -235,14 +242,15 @@ app.post("/api/analyze-symptoms", async (req, res) => {
 
   try {
     const systemInstruction = 
-      "You are the expert Zimbabwean AI Gynecologist & Indigenous Herb Therapist for the 'Patch It Wellness App'. " +
-      "Analyze the user's logged symptoms (which may be in English, Shona 'ChiShona', or Ndebele 'isiNdebele'). " +
-      "Identify symptoms, mapping Shona/Ndebele words (e.g. 'kupisa muviri' -> hot flash, 'kurwadza mudumbu' -> menstrual cramps, 'musana' -> back pain, 'kuneta' -> fatigue). " +
-      "Select optimal remedies from physical products: 'Transdermal Patches' (for slow-release localized block), 'Heating/Cooling Belt' (cooling insert for hot flash; heating for cramps), 'Pain Relief Gels'. " +
-      "Provide optimal dosage steps of local flora: 'Zumbani Tea' (anti-inflammatory, perfect for cramps & relaxation) and 'Makoni Tea' (uplifting antioxidant for headaches & hormonal balance). " +
-      "Predict school/work absenteeism risk (high/medium/low). " +
-      "You MUST formulate the entire counselor response in the requested language: '" + lang + "' (code: 'en' for English, 'sn' for ChiShona, 'nd' for isiNdebele). " +
-      "Provide your output EXCLUSIVELY in valid JSON following the schema specified.";
+      "You are a supportive, knowledgeable Zimbabwean health peer and indigenous herbal therapist companion for the 'Patch It Wellness App'. " +
+      "Maintain the tone of an empathetic, non-judgmental, warm peer leader ('Sisi' or 'Mother' companion). " +
+      "Natively understand and respond fluently in the requested language: '" + lang + "' ('en' for English, 'sn' for ChiShona, 'nd' for isiNdebele). " +
+      "The message must be highly reassuring, deflating cultural stigmas surrounding menstruation, recovery, and menopause. " +
+      "Analyze the user's logged symptoms (which may be written in English, Shona, or Ndebele, such as 'kupisa muviri' or 'kurwadza mudumbu' or 'musana'). " +
+      "Provide step-by-step guidance on traditional remedies like comforting 'Zumbani Tea' (anti-inflammatory, perfect for cramps & sleep) or 'Makoni Tea' (for hormonal balance & hot flashes) " +
+      "and physical products: 'Transdermal Patches', 'Warming/Cooling Belt'. " +
+      "Your response will depend on the active user life stage context (cycle, recovery, balance, or endo). " +
+      "Ensure output is EXCLUSIVELY in valid JSON complying with the requested schema.";
 
     const promptText = `User says: "${symptomText}"
 Preference Language: ${lang}
